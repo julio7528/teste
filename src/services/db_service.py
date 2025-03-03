@@ -45,16 +45,12 @@ def insert_with_query(query, db_url, values=None):
         engine = create_engine(db_url)
 
         # Conecta ao banco e executa a query
-        with engine.connect() as connection:
+        with engine.begin() as connection:
             if values:
                 connection.execute(text(query), values)
-                connection.commit()
             else:
-                connection.execute(text(query)) 
-                connection.commit()
+                connection.execute(text(query))
 
-        
-        
         print("Dados inseridos com sucesso!")
     except Exception as e:
         print(f"Erro ao inserir dados: {e}")
@@ -128,10 +124,8 @@ def query_to_dataframe(query, params=None):
         with engine.connect() as connection:
             if params:
                 result = connection.execute(text(query), params)
-                connection.commit()
             else:
                 result = connection.execute(text(query))
-                connection.commit()
             
             # Converte o resultado em DataFrame
             df = pd.DataFrame(result.fetchall(), columns=result.keys())

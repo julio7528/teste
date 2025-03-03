@@ -76,25 +76,28 @@ class RPALogger:
         logger = logging.getLogger("rpa001_logger")
         
         # Evitar duplicação de handlers
-        if not logger.handlers:
-            logger.setLevel(logging.DEBUG)
-            
-            # Criar o arquivo de log
-            log_file_path = os.path.join(LOG_DIRECTORY, LOG_FILE_NAME)
-            file_handler = logging.FileHandler(log_file_path, encoding='utf-8')
-            
-            # Definir o formato do log no arquivo
-            formatter = logging.Formatter(
-                '%(asctime)s | %(levelname)-8s | %(message)s',
-                datefmt='%Y-%m-%d %H:%M:%S'
-            )
-            file_handler.setFormatter(formatter)
-            logger.addHandler(file_handler)
-            
-            # Adicionar handler de console também
-            console_handler = logging.StreamHandler()
-            console_handler.setFormatter(formatter)
-            logger.addHandler(console_handler)
+        if logger.handlers:
+            return logger  # Se já tiver handlers, retorna o logger como está
+
+        logger.setLevel(logging.DEBUG)
+        
+        # Criar o arquivo de log
+        log_file_path = os.path.join(LOG_DIRECTORY, LOG_FILE_NAME)
+        file_handler = logging.FileHandler(log_file_path, encoding='utf-8')
+        
+        # Definir o formato do log no arquivo
+        formatter = logging.Formatter(
+            '%(asctime)s | %(levelname)-8s | %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+        
+        # Removemos o handler do console para evitar a duplicação
+        # Este foi o principal problema - não adicionamos mais o console_handler
+        
+        # Impedir a propagação para o logger raiz (que pode ter um handler de console)
+        logger.propagate = False
         
         return logger
     
@@ -128,9 +131,8 @@ class RPALogger:
         """.format(table_name=LOG_TABLE_NAME)
         
         try:
-            with self.engine.connect() as connection:
+            with self.engine.begin() as connection:
                 connection.execute(text(query))
-                connection.commit()
         except SQLAlchemyError as e:
             self.file_logger.error(f"Erro ao criar tabela de logs: {e}")
     
@@ -177,7 +179,7 @@ class RPALogger:
                 "memory_usage": memory_usage
             }
             
-            # Inserir no banco de dados
+            # Inserir no banco de dados usando transação
             query = f"""
             INSERT INTO public.{LOG_TABLE_NAME} 
             (timestamp, task, function, file, message, process_type, status, cpu_usage, memory_usage)
@@ -185,9 +187,9 @@ class RPALogger:
             (:timestamp, :task, :function, :file, :message, :process_type, :status, :cpu_usage, :memory_usage)
             """
             
-            with self.engine.connect() as connection:
+            # Usar with begin() para gerenciar a transação automaticamente
+            with self.engine.begin() as connection:
                 connection.execute(text(query), log_data)
-                connection.commit()
                 
         except Exception as e:
             # Falhar silenciosamente e logar apenas no arquivo
@@ -223,6 +225,9 @@ class RPALogger:
         formatted_message = self._format_log_message(
             message, file, function, process_type, status, cpu_usage, memory_usage
         )
+        
+        # Vamos imprimir a mensagem formatada no console nós mesmos, para termos controle do formato
+        print(formatted_message)
         
         # Logar no arquivo conforme o status
         if status == LogStatus.INFO:
@@ -338,26 +343,3 @@ logger = RPALogger()
 def get_logger():
     """Retorna a instância global do logger."""
     return logger
-
-# # Exemplo de uso
-# if __name__ == "__main__":
-#     logger = get_logger()
-    
-#     # Exemplos de logs para cada tipo
-#     logger.info("Iniciando aplicação", ProcessType.SYSTEM)
-#     logger.warning("Espaço em disco baixo", ProcessType.SYSTEM)
-#     logger.error("Falha ao acessar arquivo", ProcessType.FILE)
-#     logger.critical("Conexão com banco de dados perdida", ProcessType.DATABASE)
-#     logger.debug("Valor da variável x: 10", ProcessType.SYSTEM)
-#     logger.success("Processamento concluído com sucesso", ProcessType.BUSINESS)
-    
-#     try:
-#         # Simular um erro
-#         1/0
-#     except Exception:
-#         logger.exception("Erro inesperado durante o processamento", ProcessType.BUSINESS)
-    
-#     # Recuperar logs
-#     logs_df = logger.get_logs(limit=5)
-#     print("\nÚltimos 5 logs:")
-#     print(logs_df)
