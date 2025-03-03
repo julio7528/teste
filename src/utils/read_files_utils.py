@@ -36,48 +36,52 @@ def read_excel_file(caminhoArquivo, header=2, sheet_name=0):
     
 
 def capture_code_from_docx(caminho_arquivo, prefixos=["Código:", "CÓDIGO DO MATERIAL", "CÓDIGO", "Código do Produto: ", "CÓDIGO INTERNO DO MATERIAL"]):
-    # Ordena os prefixos por comprimento decrescente para dar prioridade aos mais específicos
-    prefixos = sorted(prefixos, key=len, reverse=True)
-    
-    # Abre o arquivo Word
-    documento = Document(caminho_arquivo)
-    
-    # Verifica parágrafos no documento
-    for i, paragrafo in enumerate(documento.paragraphs):
-        texto = paragrafo.text.strip()
-        for prefixo in prefixos:  # Itera pelos prefixos em ordem de prioridade
-            if texto.startswith(prefixo):
-                # Captura o código após o prefixo
-                codigo = texto[len(prefixo):].strip()
-                
-                if not codigo or codigo == ":":
-                    for j in range(i + 1, len(documento.paragraphs)):
-                        prox_paragrafo = documento.paragraphs[j].text.strip()
-                        if prox_paragrafo:
-                            codigo = prox_paragrafo
-                            break
-                
-                # Retorna se encontrar um código válido
-                if codigo and codigo != ":":
-                    return codigo.replace('.', '')
-    
-    # Verifica tabelas no documento se o código não foi encontrado nos parágrafos
-    for tabela in documento.tables:
-        for i, linha in enumerate(tabela.rows):
-            celulas = [celula.text.strip() for celula in linha.cells]
-            for j, texto in enumerate(celulas):
-                for prefixo in prefixos:
-                    if texto.startswith(prefixo):
-                        codigo = texto[len(prefixo):].strip()
-                        
-                        if not codigo and j + 1 < len(celulas):
-                            codigo = celulas[j + 1].strip()
-                        
-                        if codigo and codigo != ":":
-                            return codigo.replace('.', '')
+    try:
+        # Ordena os prefixos por comprimento decrescente para dar prioridade aos mais específicos
+        prefixos = sorted(prefixos, key=len, reverse=True)
+        
+        # Abre o arquivo Word
+        documento = Document(caminho_arquivo)
+        
+        # Verifica parágrafos no documento
+        for i, paragrafo in enumerate(documento.paragraphs):
+            texto = paragrafo.text.strip()
+            for prefixo in prefixos:  # Itera pelos prefixos em ordem de prioridade
+                if texto.startswith(prefixo):
+                    # Captura o código após o prefixo
+                    codigo = texto[len(prefixo):].strip()
+                    
+                    if not codigo or codigo == ":":
+                        for j in range(i + 1, len(documento.paragraphs)):
+                            prox_paragrafo = documento.paragraphs[j].text.strip()
+                            if prox_paragrafo:
+                                codigo = prox_paragrafo
+                                break
+                    
+                    # Retorna se encontrar um código válido
+                    if codigo and codigo != ":":
+                        return codigo.replace('.', '')
+        
+        # Verifica tabelas no documento se o código não foi encontrado nos parágrafos
+        for tabela in documento.tables:
+            for i, linha in enumerate(tabela.rows):
+                celulas = [celula.text.strip() for celula in linha.cells]
+                for j, texto in enumerate(celulas):
+                    for prefixo in prefixos:
+                        if texto.startswith(prefixo):
+                            codigo = texto[len(prefixo):].strip()
+                            
+                            if not codigo and j + 1 < len(celulas):
+                                codigo = celulas[j + 1].strip()
+                            
+                            if codigo and codigo != ":":
+                                return codigo.replace('.', '')
 
-    # Se nenhum código for encontrado
-    return "Nenhum código encontrado."
+        # Se nenhum código for encontrado
+        return "Nenhum código encontrado."
+    except Exception as e:
+        logging.error(f"Erro ao tentar capturar o código do documento: {e}")
+        return "Erro ao capturar o código."
 
 def get_headers_texts(caminho_arquivo):
     header_texts_data = []
@@ -195,19 +199,25 @@ def capture_code_from_headers(caminho_arquivo, prefixos=["Código do Produto: "]
     return codigo_encontrado, instrucao_encontrada
 
 def convert_doc_to_docx(input_path, output_path):
-    word = win32com.client.Dispatch("Word.Application")
-    doc = word.Documents.Open(input_path)
-    doc.SaveAs(output_path, FileFormat=16)  # 16 corresponde ao formato .docx
-    doc.Close()
-    word.Quit()
+    try:
+        word = win32com.client.Dispatch("Word.Application")
+        doc = word.Documents.Open(input_path)
+        doc.SaveAs(output_path, FileFormat=16)  # 16 corresponde ao formato .docx
+        doc.Close()
+        word.Quit()
+    except Exception as e:
+        logging.error(f"Erro ao tentar converter o arquivo doc_to_docx: {e}")
 
 
 def convert_docx_to_doc(input_path, output_path):
-    word = win32com.client.Dispatch("Word.Application")
-    doc = word.Documents.Open(input_path)
-    doc.SaveAs(output_path, FileFormat=0)
-    doc.Close()
-    word.Quit()
+    try:
+        word = win32com.client.Dispatch("Word.Application")
+        doc = word.Documents.Open(input_path)
+        doc.SaveAs(output_path, FileFormat=0)
+        doc.Close()
+        word.Quit()
+    except Exception as e:
+        logging.error(f"Erro ao tentar converter o arquivo docx_to_doc: {e}")
 
 
 

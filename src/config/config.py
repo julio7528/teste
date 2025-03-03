@@ -1,10 +1,20 @@
+
 from dotenv import load_dotenv
 import os
 from urllib.parse import quote
+from src.utils.logger import ProcessType, initialize_logger, get_logger
+
+#declarar uma variavel looger global
+
 
 # Função para carregar variáveis de ambiente
 def load_config():
     load_dotenv()
+    # Initialize logger with database URL
+    initialize_logger(get_database_url())
+    logger = get_logger()
+    logger.info("Carregando configurações do env", ProcessType.SYSTEM)
+
 
 def get_environment():
     """Obtém o ambiente de execução (local ou supabase)."""
@@ -100,4 +110,4 @@ def generate_default_foldes():
     for folder in foldes_to_create:
         if not os.path.exists(fr"{default_path}\{folder}"):
             os.makedirs(fr"{default_path}\{folder}")
-            print(f"Caminho {folder} criado com sucesso.")
+            logger.info(f"Caminho {folder} criado com sucesso.")

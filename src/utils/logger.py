@@ -16,15 +16,10 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 src_dir = os.path.join(current_dir, '..')
 sys.path.append(src_dir)
 
-# Importar a config para acessar variáveis de ambiente
-from config.config import load_config, get_database_url
-
-# Carregar as configurações
-load_config()
-
 # Definir constantes
 LOG_DIRECTORY = os.path.join(src_dir, '..', 'logs')
-LOG_FILE_NAME = f"rpa001_{datetime.now().strftime('%Y%m%d')}.log"
+# file with date and time 
+LOG_FILE_NAME = f"rpa001_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
 LOG_TABLE_NAME = "rpa001_logs"
 
 # Garantir que o diretório de logs exista
@@ -55,15 +50,20 @@ class RPALogger:
     Classe de log para o RPA001, que salva logs em arquivo e banco de dados.
     """
     
-    def __init__(self):
-        """Inicializa o logger."""
+    def __init__(self, db_url=None):
+        """Inicializa o logger.
+        
+        Args:
+            db_url (str, optional): URL de conexão com o banco de dados. Se None, 
+                                   o log no banco será desabilitado.
+        """
         self.task_name = os.getenv("RPA_TASK_NAME", "RPA001")
         
         # Configurar logger de arquivo
         self.file_logger = self._setup_file_logger()
         
         # Preparar conexão com banco de dados
-        self.db_url = get_database_url()
+        self.db_url = db_url
         self.engine = None
         try:
             self.engine = create_engine(self.db_url)
@@ -143,13 +143,25 @@ class RPALogger:
         return cpu_usage, memory_usage
     
     def _get_caller_info(self):
-        """Obtém informações sobre a função e arquivo que chamou o logger."""
-        stack = inspect.stack()
-        # Pular o frame do próprio logger e pegar o chamador
-        frame = stack[2]
-        file_path = os.path.basename(frame.filename)
-        function_name = frame.function
-        return file_path, function_name
+            """
+            Obtém informações sobre a função e arquivo que chamou o logger.
+            Percorre a pilha de chamadas para encontrar o primeiro frame fora do módulo de logging.
+            """
+            stack = inspect.stack()
+            for frame_info in stack[2:]:  # Começa do terceiro frame para pular os frames internos
+                file_path = frame_info.filename
+                
+                # Ignora frames de dentro do módulo de logging
+                if 'logger.py' not in file_path and 'log_viewer.py' not in file_path:
+                    file_path = os.path.basename(file_path)
+                    function_name = frame_info.function
+                    return file_path, function_name
+            
+            # Se não encontrar um frame válido, usa o padrão
+            frame = stack[2]
+            file_path = os.path.basename(frame.filename)
+            function_name = frame.function
+            return file_path, function_name
     
     def _log_to_database(self, message, process_type, status, file=None, function=None):
         """Salva o log no banco de dados."""
@@ -336,10 +348,24 @@ class RPALogger:
             return pd.DataFrame()
 
 
-# Instância global do logger
-logger = RPALogger()
+# Instância global do logger (inicializada como None)
+logger = None
 
-# Função para obter a instância do logger
+def initialize_logger(db_url=None):
+    """Inicializa o logger global.
+    
+    Args:
+        db_url (str, optional): URL de conexão com o banco de dados.
+    """
+    global logger
+    logger = RPALogger(db_url)
+
 def get_logger():
-    """Retorna a instância global do logger."""
+    """Retorna a instância global do logger.
+    
+    Raises:
+        RuntimeError: Se o logger não foi inicializado.
+    """
+    if logger is None:
+        raise RuntimeError("Logger não foi inicializado. Chame initialize_logger() primeiro.")
     return logger
