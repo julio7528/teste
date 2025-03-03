@@ -1,0 +1,34 @@
+# Ignorar pastas
+Arquivos Exemplos/
+data/
+pdd/
+
+# Arquivos de ambiente
+.env
+.env.local
+.env.*.local
+
+# Diretórios de dependências
+venv/
+node_modules/
+
+# Arquivos de IDE
+.vscode/
+.idea/
+
+# Arquivos de sistema
+Thumbs.db
+.DS_Store
+
+# Arquivos compilados
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Logs e databases
+*.log
+*.sqlite
+
+# Arquivos de configuração local
+*.local
