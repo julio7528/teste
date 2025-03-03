@@ -564,7 +564,6 @@ def main():
         rf"{get_caminho_rede()}\LISTA-DE-FORNECEDORES"
     ]
     logger.info("Procurando arquivos nas pastas definidas", ProcessType.FILE)
-    print("Procurando arquivos nas pastas:")   
     
     # Iterar sobre as pastas e listar seus nomes
     for pasta in pastas:
@@ -577,15 +576,12 @@ def main():
     
     if arquivos:
         logger.info("Carregando tabela DE-PARA...", ProcessType.DATABASE)
-        print(f"Carregando tabela DE-PARA...")
         caminho_arquivo_excel = get_caminho_de_para()
         df = read_excel_file(caminho_arquivo_excel)
-        logger.success(f"Tabela DE-PARA carregada: {len(df)} registros", ProcessType.DATABASE)
-        print(f"✓ Tabela DE-PARA carregada: {len(df)} registros")
+        logger.success(f"Tabela DE-PARA carregada: {len(df)} registros", ProcessType.DATABASE)        
         
-        logger.info(f"Iniciando processamento de {len(arquivos)} arquivos", ProcessType.BUSINESS)
         print("\n" + "-"*50)
-        print(f"INICIANDO PROCESSAMENTO DE {len(arquivos)} ARQUIVOS")
+        logger.info(f"Iniciando processamento de {len(arquivos)} arquivos", ProcessType.BUSINESS)
         print("-"*50)
         
         for arquivo in arquivos:
@@ -599,17 +595,13 @@ def main():
 
             if caminho_input is None:
                 logger.error(f"Caminho de entrada não encontrado para o arquivo {arquivo}", ProcessType.FILE)
-                print(f"❌ ERRO: Caminho de entrada não encontrado para o arquivo {arquivo}")
                 continue
             
             processar_arquivo(arquivo, caminho_input, df)
     else:
         logger.info("Nenhum arquivo encontrado nas pastas especificadas", ProcessType.FILE)
-        print("ℹ️ Nenhum arquivo encontrado nas pastas especificadas.")
-
-    logger.success("Processamento de arquivos concluído", ProcessType.BUSINESS)
     print("\n" + "-"*50)
-    print("PROCESSAMENTO DE ARQUIVOS CONCLUÍDO")
+    logger.success("Processamento de arquivos concluído", ProcessType.BUSINESS)
     print("-"*50)
 
 
@@ -643,9 +635,9 @@ if __name__ == "__main__":
     ;
     """
 
-    logger.info("Verificando arquivos para upload no SeSuite", ProcessType.DATABASE)
+
     print("\n" + "="*50)
-    print("VERIFICANDO ARQUIVOS PARA UPLOAD NO SESUITE")
+    logger.info("Verificando arquivos para upload no SeSuite", ProcessType.DATABASE)
     print("="*50)
     print("Executando query:")
     print(query)
@@ -654,19 +646,15 @@ if __name__ == "__main__":
     
     if not df.empty:
         logger.success(f"{len(df)} arquivos encontrados para upload no SeSuite", ProcessType.DATABASE)
-        print(f"✓ {len(df)} arquivos encontrados para upload no SeSuite")
+        print("\n" + "="*50)
         logger.info("Iniciando upload para SeSuite", ProcessType.SELENIUM)
-        print("\n" + "="*50)
-        print("INICIANDO UPLOAD PARA SESUITE")
         print("="*50)
-        NavegationSeSuite(df)
-        logger.success("Upload para SeSuite finalizado", ProcessType.SELENIUM)
+        NavegationSeSuite(df)        
         print("\n" + "="*50)
-        print("UPLOAD PARA SESUITE FINALIZADO")
+        logger.success("Upload para SeSuite finalizado", ProcessType.SELENIUM)
         print("="*50)
     else:
         logger.info("Nenhum arquivo encontrado para upload no SeSuite", ProcessType.DATABASE)
-        print("ℹ️ Nenhum arquivo encontrado para upload no SeSuite")
 
     query = f"""SELECT *
         FROM public.rpa001_controle_execucao
@@ -684,9 +672,9 @@ if __name__ == "__main__":
         ;
     """
 
-    logger.info("Verificando arquivos para homologação no SeSuite", ProcessType.DATABASE)
+    
     print("\n" + "="*50)
-    print("VERIFICANDO ARQUIVOS PARA HOMOLOGAÇÃO NO SESUITE")
+    logger.info("Verificando arquivos para homologação no SeSuite", ProcessType.DATABASE)
     print("="*50)
     print("Executando query:")
     print(query)
@@ -694,20 +682,16 @@ if __name__ == "__main__":
     df = query_to_dataframe(query)
 
     if not df.empty:
-        logger.success(f"{len(df)} arquivos encontrados para homologação no SeSuite", ProcessType.DATABASE)
-        print(f"✓ {len(df)} arquivos encontrados para homologação no SeSuite")
-        logger.info("Iniciando homologação no SeSuite", ProcessType.SELENIUM)
+        logger.success(f"{len(df)} arquivos encontrados para homologação no SeSuite", ProcessType.DATABASE)        
         print("\n" + "="*50)
-        print("INICIANDO HOMOLOGAÇÃO NO SESUITE")
+        logger.info("Iniciando homologação no SeSuite", ProcessType.SELENIUM)
         print("="*50)
         HomologacaoSeSuite(df)
-        logger.success("Homologação no SeSuite finalizada", ProcessType.SELENIUM)
         print("\n" + "="*50)
-        print("HOMOLOGAÇÃO NO SESUITE FINALIZADA")
+        logger.success("Homologação no SeSuite finalizada", ProcessType.SELENIUM)
         print("="*50)
     else:
         logger.info("Nenhum arquivo encontrado para homologação no SeSuite", ProcessType.DATABASE)
-        print("ℹ️ Nenhum arquivo encontrado para homologação no SeSuite")
 
     query = """SELECT *
         FROM public.rpa001_controle_execucao
@@ -717,9 +701,8 @@ if __name__ == "__main__":
     AND relatorio = '0'; 
     """
 
-logger.info("Verificando registros para geração de relatório", ProcessType.DATABASE)
 print("\n" + "="*50)
-print("VERIFICANDO REGISTROS PARA GERAÇÃO DE RELATÓRIO")
+logger.info("Verificando registros para geração de relatório", ProcessType.DATABASE)
 print("="*50)
 print("Executando query:")
 print(query)
@@ -728,7 +711,6 @@ df = query_to_dataframe(query)
 
 if not df.empty:
     logger.success(f"{len(df)} registros encontrados para geração de relatório", ProcessType.DATABASE)
-    print(f"✓ {len(df)} registros encontrados para geração de relatório")
     gerar_relatorio_e_enviar_email(df)
     
     # Atualizar o status de relatório para evitar duplicação
@@ -751,10 +733,8 @@ if not df.empty:
         logger.error(f"Erro ao atualizar status de relatório: {e}", ProcessType.DATABASE)
 else:
     logger.info("Nenhum registro encontrado para geração de relatório", ProcessType.DATABASE)
-    print("ℹ️ Nenhum registro encontrado para geração de relatório")
 
-logger.success("Processo de automação RPA001 concluído", ProcessType.SYSTEM)
 print("\n" + "="*50)
-print("PROCESSO DE AUTOMAÇÃO RPA001 CONCLUÍDO")
+logger.success("Processo de automação RPA001 concluído", ProcessType.SYSTEM)
 print(f"Data e hora de término: {datetime.datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
 print("="*50 + "\n")
