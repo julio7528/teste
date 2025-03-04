@@ -55,7 +55,7 @@ class RPALogger:
         
         Args:
             db_url (str, optional): URL de conexão com o banco de dados. Se None, 
-                                   o log no banco será desabilitado.
+                                o log no banco será desabilitado.
         """
         self.task_name = os.getenv("RPA_TASK_NAME", "RPA001")
         
@@ -85,19 +85,53 @@ class RPALogger:
         log_file_path = os.path.join(LOG_DIRECTORY, LOG_FILE_NAME)
         file_handler = logging.FileHandler(log_file_path, encoding='utf-8')
         
-        # Definir o formato do log no arquivo
-        formatter = logging.Formatter(
-            '%(asctime)s | %(levelname)-8s | %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S'
-        )
+        # Formatador personalizado que não faz nada, apenas passa a mensagem
+        class PassThroughFormatter(logging.Formatter):
+            def format(self, record):
+                return record.getMessage()
+        
+        formatter = PassThroughFormatter()
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
         
-        # Removemos o handler do console para evitar a duplicação
-        # Este foi o principal problema - não adicionamos mais o console_handler
-        
-        # Impedir a propagação para o logger raiz (que pode ter um handler de console)
+        # Impedir a propagação para o logger raiz
         logger.propagate = False
+        
+        # Definir larguras exatas das colunas para garantir alinhamento
+        self.column_widths = {
+            'timestamp': 19,
+            'level': 12,  # Aumentado para acomodar "INFORMATION" e "SUCCESS"
+            'task': 8,
+            'function': 25,
+            'file': 15,
+            'message': 60,
+            'process_type': 12,
+            'status': 12,
+            'cpu_usage': 5,
+            'mem_usage': 5
+        }
+        
+        # Adicionar cabeçalho ao arquivo de log se for um arquivo novo
+        if not os.path.exists(log_file_path) or os.path.getsize(log_file_path) == 0:
+            with open(log_file_path, 'w', encoding='utf-8') as f:
+                # Cabeçalho com as larguras definidas e alinhadas
+                header_row = (
+                    f"{'TIMESTAMP'.ljust(self.column_widths['timestamp'])} | "
+                    f"{'LEVEL'.ljust(self.column_widths['level'])} | "
+                    f"{'TASK'.ljust(self.column_widths['task'])} | "
+                    f"{'FUNCTION'.ljust(self.column_widths['function'])} | "
+                    f"{'FILE'.ljust(self.column_widths['file'])} | "
+                    f"{'MESSAGE'.ljust(self.column_widths['message'])} | "
+                    f"{'PROCESS_TYPE'.ljust(self.column_widths['process_type'])} | "
+                    f"{'STATUS'.ljust(self.column_widths['status'])} | "
+                    f"{'CPU_USAGE'.ljust(self.column_widths['cpu_usage'])} | "
+                    f"{'MEM_USAGE'.ljust(self.column_widths['mem_usage'])}"
+                )
+                f.write(header_row + "\n")
+                
+                # Linha separadora com exatamente o mesmo comprimento
+                separator_line = "-" * len(header_row)
+                f.write(separator_line + "\n")
         
         return logger
     
@@ -163,20 +197,104 @@ class RPALogger:
             function_name = frame.function
             return file_path, function_name
     
+    def _format_log_message(self, message, file, function, process_type, status, cpu_usage, memory_usage):
+        """
+        Formata a mensagem de log para o arquivo com colunas de largura fixa.
+        
+        Args:
+            message (str): Mensagem de log
+            file (str): Nome do arquivo
+            function (str): Nome da função
+            process_type (ProcessType): Tipo de processo
+            status (LogStatus): Status do log
+            cpu_usage (float): Uso de CPU
+            memory_usage (float): Uso de memória
+            
+        Returns:
+            str: Mensagem formatada
+        """
+        # Gera o timestamp
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Formata os valores com base nas larguras de coluna
+        timestamp_str = timestamp.ljust(self.column_widths['timestamp'])
+        level_str = status.value.upper().ljust(self.column_widths['level'])
+        task_str = self.task_name.ljust(self.column_widths['task'])
+        
+        # Truncar campos longos
+        function_str = function[:self.column_widths['function']].ljust(self.column_widths['function'])
+        file_str = file[:self.column_widths['file']].ljust(self.column_widths['file'])
+        process_type_str = process_type.value.ljust(self.column_widths['process_type'])
+        status_str = status.value.ljust(self.column_widths['status'])
+        
+        # Formatação dos valores de CPU e memória
+        cpu_str = f"{int(cpu_usage)}".ljust(self.column_widths['cpu_usage'])
+        mem_str = f"{int(memory_usage)}".ljust(self.column_widths['mem_usage'])
+        
+        # Lista para armazenar as linhas formatadas
+        formatted_lines = []
+        
+        # Quebra a mensagem em partes que cabem na coluna mensagem
+        remaining_message = message
+        while remaining_message:
+            if len(remaining_message) <= self.column_widths['message']:
+                # Se a mensagem inteira cabe na largura da coluna
+                message_part = remaining_message.ljust(self.column_widths['message'])
+                remaining_message = ""
+            else:
+                # Encontra um ponto de quebra (espaço) próximo ao limite
+                split_pos = remaining_message[:self.column_widths['message']].rfind(' ')
+                if split_pos == -1 or split_pos < self.column_widths['message'] * 0.8:
+                    # Se não encontrar um espaço ou se estiver muito no início, corta no tamanho exato
+                    split_pos = self.column_widths['message']
+                
+                message_part = remaining_message[:split_pos].ljust(self.column_widths['message'])
+                remaining_message = remaining_message[split_pos:].lstrip()
+            
+            if not formatted_lines:
+                # Primeira linha: inclui todas as colunas
+                formatted_line = (
+                    f"{timestamp_str} | {level_str} | {task_str} | {function_str} | "
+                    f"{file_str} | {message_part} | {process_type_str} | {status_str} | "
+                    f"{cpu_str} | {mem_str}"
+                )
+            else:
+                # Linhas continuação: só inclui a mensagem, mantendo o alinhamento
+                formatted_line = (
+                    f"{' '.ljust(self.column_widths['timestamp'])} | "
+                    f"{' '.ljust(self.column_widths['level'])} | "
+                    f"{' '.ljust(self.column_widths['task'])} | "
+                    f"{' '.ljust(self.column_widths['function'])} | "
+                    f"{' '.ljust(self.column_widths['file'])} | "
+                    f"{message_part} | "
+                    f"{' '.ljust(self.column_widths['process_type'])} | "
+                    f"{' '.ljust(self.column_widths['status'])} | "
+                    f"{' '.ljust(self.column_widths['cpu_usage'])} | "
+                    f"{' '.ljust(self.column_widths['mem_usage'])}"
+                )
+            
+            formatted_lines.append(formatted_line)
+        
+        return "\n".join(formatted_lines)
+
     def _log_to_database(self, message, process_type, status, file=None, function=None):
         """Salva o log no banco de dados."""
-        if not self.engine:
+        if not self.db_url:
+            print(f"\033[93m[AVISO] URL do banco de dados não configurada. Log não será salvo no banco.\033[0m")
             return
             
         try:
             # Obter informações do sistema
             cpu_usage, memory_usage = self._get_system_info()
             
-            # Se file e function não foram fornecidos, tentar detectar automaticamente
-            if not file or not function:
-                detected_file, detected_function = self._get_caller_info()
-                file = file or detected_file
-                function = function or detected_function
+            # Verificar se a engine é válida ou criar uma nova
+            if not self.engine:
+                try:
+                    self.engine = create_engine(self.db_url)
+                    self._create_log_table_if_not_exists()
+                except Exception as e:
+                    print(f"\033[91m[ERRO] Falha ao criar conexão com o banco: {e}\033[0m")
+                    return
                 
             # Preparar os dados do log
             log_data = {
@@ -191,31 +309,101 @@ class RPALogger:
                 "memory_usage": memory_usage
             }
             
-            # Inserir no banco de dados usando transação
+            # Inserir no banco de dados
             query = f"""
             INSERT INTO public.{LOG_TABLE_NAME} 
             (timestamp, task, function, file, message, process_type, status, cpu_usage, memory_usage)
-            VALUES 
+            VALUES
             (:timestamp, :task, :function, :file, :message, :process_type, :status, :cpu_usage, :memory_usage)
             """
             
-            # Usar with begin() para gerenciar a transação automaticamente
             with self.engine.begin() as connection:
                 connection.execute(text(query), log_data)
                 
         except Exception as e:
-            # Falhar silenciosamente e logar apenas no arquivo
-            self.file_logger.error(f"Erro ao salvar log no banco de dados: {e}")
+            print(f"\033[91m[ERRO DB] Falha ao salvar log no banco: {e}\033[0m")
+            # Imprime stack trace para facilitar diagnóstico
+            print(f"\033[91m{traceback.format_exc()}\033[0m")
     
-    def _format_log_message(self, message, file, function, process_type, status, cpu_usage, memory_usage):
-        """Formata a mensagem de log para o arquivo."""
+
+        """
+        Formata a mensagem de log para o arquivo com colunas de largura fixa.
+        
+        Args:
+            message (str): Mensagem de log
+            file (str): Nome do arquivo
+            function (str): Nome da função
+            process_type (ProcessType): Tipo de processo
+            status (LogStatus): Status do log
+            cpu_usage (float): Uso de CPU
+            memory_usage (float): Uso de memória
+            
+        Returns:
+            str: Mensagem formatada
+        """
+        # Define as larguras das colunas
+        timestamp_width = 19
+        level_width = 8
+        task_width = 8
+        function_width = 25
+        file_width = 15
+        message_width = 60
+        process_type_width = 12
+        status_width = 12
+        cpu_usage_width = 10
+        mem_usage_width = 10
+        
+        # Gera o timestamp
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        return (f"{timestamp} | {self.task_name} | {function} | {file} | {message} | "
-                f"{process_type.value} | {status.value} | CPU: {cpu_usage:.2f}% | MEM: {memory_usage:.2f}%")
+        
+        # Trunca ou preenche os campos para garantir a largura fixa
+        timestamp_str = timestamp.ljust(timestamp_width)
+        level_str = status.value.upper().ljust(level_width)
+        task_str = self.task_name.ljust(task_width)
+        
+        # Trunca os campos que podem ser muito longos
+        function_str = function[:function_width].ljust(function_width)
+        file_str = file[:file_width].ljust(file_width)
+        process_type_str = process_type.value.ljust(process_type_width)
+        status_str = status.value.ljust(status_width)
+        
+        # Formata os valores de CPU e memória
+        cpu_str = f"{cpu_usage:.0f}".ljust(cpu_usage_width)
+        mem_str = f"{memory_usage:.0f}".ljust(mem_usage_width)
+        
+        # Se a mensagem for mais longa que a largura máxima, quebra em múltiplas linhas
+        messages = []
+        remaining = message
+        
+        # Primeira linha com todos os campos
+        first_part = remaining[:message_width]
+        messages.append(
+            f"{timestamp_str} | {level_str} | {task_str} | {function_str} | {file_str} | "
+            f"{first_part.ljust(message_width)} | {process_type_str} | {status_str} | "
+            f"{cpu_str} | {mem_str}"
+        )
+        
+        # Linhas adicionais apenas com a mensagem
+        if len(remaining) > message_width:
+            remaining = remaining[message_width:]
+            while remaining:
+                next_part = remaining[:message_width]
+                remaining = remaining[message_width:]
+                
+                # Cria uma linha continuação apenas com a mensagem, mantendo os alinhamentos
+                continuation = (
+                    f"{' '.ljust(timestamp_width)} | {' '.ljust(level_width)} | {' '.ljust(task_width)} | "
+                    f"{' '.ljust(function_width)} | {' '.ljust(file_width)} | {next_part.ljust(message_width)} | "
+                    f"{' '.ljust(process_type_width)} | {' '.ljust(status_width)} | "
+                    f"{' '.ljust(cpu_usage_width)} | {' '.ljust(mem_usage_width)}"
+                )
+                messages.append(continuation)
+        
+        return "\n".join(messages)
     
     def log(self, message, process_type, status, file=None, function=None):
         """
-        Registra uma mensagem de log no arquivo e no banco de dados.
+        Registra uma mensagem de log no arquivo, banco de dados e console.
         
         Args:
             message (str): Mensagem de log
@@ -232,32 +420,50 @@ class RPALogger:
             detected_file, detected_function = self._get_caller_info()
             file = file or detected_file
             function = function or detected_function
-            
+        
         # Formatar a mensagem para o arquivo de log
         formatted_message = self._format_log_message(
             message, file, function, process_type, status, cpu_usage, memory_usage
         )
         
-        # Vamos imprimir a mensagem formatada no console nós mesmos, para termos controle do formato
-        print(formatted_message)
+        # Exibir no console com cores
+        self._print_console_message(message, process_type, status, file, function, cpu_usage, memory_usage)
         
-        # Logar no arquivo conforme o status
-        if status == LogStatus.INFO:
-            self.file_logger.info(formatted_message)
-        elif status == LogStatus.WARNING:
-            self.file_logger.warning(formatted_message)
-        elif status == LogStatus.ERROR:
-            self.file_logger.error(formatted_message)
-        elif status == LogStatus.CRITICAL:
-            self.file_logger.critical(formatted_message)
-        elif status == LogStatus.DEBUG:
-            self.file_logger.debug(formatted_message)
-        elif status == LogStatus.SUCCESS:
-            self.file_logger.info(formatted_message)  # Usar info para success
-            
+        # Logar no arquivo
+        self.file_logger.info(formatted_message)
+        
         # Salvar no banco de dados
         self._log_to_database(message, process_type, status, file, function)
     
+    def _print_console_message(self, message, process_type, status, file, function, cpu_usage, memory_usage):
+        """
+        Exibe uma mensagem formatada no console com cores.
+        """
+        # Timestamp para uso no console
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Definir as cores para diferentes status
+        color_code = ""
+        if status == LogStatus.ERROR or status == LogStatus.CRITICAL:
+            color_code = "\033[91m"  # Vermelho
+        elif status == LogStatus.WARNING:
+            color_code = "\033[93m"  # Amarelo
+        elif status == LogStatus.SUCCESS:
+            color_code = "\033[92m"  # Verde
+        elif status == LogStatus.INFO:
+            color_code = "\033[94m"  # Azul
+        elif status == LogStatus.DEBUG:
+            color_code = "\033[90m"  # Cinza
+        
+        reset_code = "\033[0m"  # Resetar cor
+        
+        # Formatar mensagem do console
+        console_message = f"[{timestamp}] [{status.value.upper()}] [{process_type.value}] {message} (CPU: {int(cpu_usage)}%, MEM: {int(memory_usage)}%)"
+        
+        # Exibir mensagem no console
+        print(f"{color_code}{console_message}{reset_code}")
+            
+
     def info(self, message, process_type, file=None, function=None):
         """Registra uma mensagem informativa."""
         self.log(message, process_type, LogStatus.INFO, file, function)
