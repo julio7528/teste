@@ -41,10 +41,8 @@ def carregar_configuracoes():
         load_config()  # Assuming load_config correctly loads the configurations
         generate_default_foldes()
         logger.success("Configurações carregadas com sucesso", ProcessType.SYSTEM)
-        print("✓ Configurações carregadas com sucesso.")
     except Exception as e:
         logger.critical(f"Erro ao carregar configurações: {e}", ProcessType.SYSTEM)
-        print(f"❌ ERRO ao carregar configurações: {e}")
 
 # Função para listar os arquivos nas pastas
 def listar_arquivos(pastas):
@@ -95,7 +93,6 @@ def gerar_relatorio_e_enviar_email(df):
     relatorio_excel = "relatorio_rpa001.xlsx"
     df.to_excel(relatorio_excel, index=False, engine="openpyxl")
     logger.success(f"Relatório salvo em: {relatorio_excel}", ProcessType.FILE)
-    print(f"✓ Relatório salvo em: {relatorio_excel}")
 
     # Configurações do e-mail
     remetente = "seu_email@example.com"
@@ -104,7 +101,7 @@ def gerar_relatorio_e_enviar_email(df):
     assunto = "Relatório RPA001 Controle Execução"
 
     logger.info("Preparando e-mail com relatório anexo", ProcessType.NETWORK)
-    print("Preparando e-mail com relatório anexo...")
+
     # Criar o e-mail com anexo
     msg = MIMEMultipart()
     msg["From"] = remetente
@@ -122,7 +119,6 @@ def gerar_relatorio_e_enviar_email(df):
     # Enviar o e-mail
     try:
         logger.info("Enviando e-mail com relatório", ProcessType.NETWORK)
-        print("Enviando e-mail...")
         with smtplib.SMTP("smtp.gmail.com", 587) as server:
             server.starttls()
             server.login(remetente, senha)
@@ -135,7 +131,6 @@ def gerar_relatorio_e_enviar_email(df):
         print(f"  - Anexo: {relatorio_excel}")
     except Exception as e:
         logger.error(f"Erro ao enviar e-mail: {e}", ProcessType.NETWORK)
-        print(f"❌ ERRO ao enviar e-mail: {e}")
 
 # Função para editar o arquivo conforme o tipo
 def editar_arquivo(arquivo, codigo_word, novo_codigo, tipoDocumento, df_para):

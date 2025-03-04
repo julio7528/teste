@@ -62,6 +62,19 @@ class RPALogger:
         # Configurar logger de arquivo
         self.file_logger = self._setup_file_logger()
         
+        self.column_widths = {
+            'timestamp': 19,
+            'level': 12,
+            'task': 8,
+            'function': 25,
+            'file': 15,
+            'message': 60,
+            'process_type': 12,
+            'status': 12,
+            'cpu_usage': 9,
+            'mem_usage': 5
+            }
+            
         # Preparar conexão com banco de dados
         self.db_url = db_url
         self.engine = None
